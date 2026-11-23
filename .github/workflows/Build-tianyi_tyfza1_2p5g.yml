@@ -1,4 +1,4 @@
-name: Build PT1570-R10 (rtl9617c FIT)
+name: Build tianyi_tyfza1_2p5g (rtl9617c FIT)
 
 # ================================================================
 # P3TERX/AN758X 模板风格的极简云编译：
@@ -89,7 +89,7 @@ env:
 
 jobs:
   build:
-    name: FIT / rtl9617c / PT1570-R10
+    name: FIT / rtl9617c / tianyi_tyfza1_2p5g
     runs-on: ubuntu-24.04
     timeout-minutes: 480
 
