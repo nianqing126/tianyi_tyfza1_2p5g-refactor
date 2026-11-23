@@ -338,9 +338,9 @@ grep -q '^CONFIG_RTW89_8192XBE=y$' target/linux/rtl9617c/config-6.18 \
   || fail "config-6.18 缺 CONFIG_RTW89_8192XBE=y"
 grep -q '^CONFIG_MTD_UBI_NVMEM=y$' target/linux/rtl9617c/config-6.18 \
   || fail "config-6.18 缺 CONFIG_MTD_UBI_NVMEM=y（factory 校准读不到）"
-grep -q 'wifi_cal_radio1' target/linux/rtl9617c/dts/rtl9617c-pt1570-r10.dts \
-  || fail "R10 DTS 未绑定 factory 校准 cell"
-echo "  OK   rtw89 官方驱动 + factory nvmem 校准链路"
+grep -q 'wifi_cal_radio1' target/linux/rtl9617c/dts/rtl9617c-tyfza1.dtsi \
+  || fail "公共 dtsi 未绑定 factory 校准 cell（overlay-rtw89.sh 未落地？）"
+echo "  OK   rtw89 官方驱动 + factory nvmem 校准链路（全机型）"
 
 echo "===== key config ====="
 grep -E '^CONFIG_TARGET_(BOARD|SUBTARGET)=' .config || true
