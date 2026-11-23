@@ -410,6 +410,14 @@ done
   && ok "构建链已无生效的 kmod-rtl-ax-ap" || bad "仍有生效的 kmod-rtl-ax-ap"
 ! grep -q 'overlay-wifi-driver' diy-part1.sh diy-part2.sh \
   && ok "diy 不再调用旧 overlay 脚本" || bad "diy 仍调用 overlay-wifi-driver.sh"
+# 校准绑定必须落到公共 dtsi（全机型），不能写死 R10 板级 DTS ——
+# 否则切到天邑机型时 rtw89 读不到 factory 校准 -> 无 WLAN。
+grep -q 'DTS="\$WRT/target/linux/rtl9617c/dts/rtl9617c-tyfza1.dtsi"' scripts/overlay-rtw89.sh \
+  && ok "overlay 校准绑定目标为公共 dtsi（全机型）" \
+  || bad "overlay 校准绑定目标不是公共 dtsi（天邑机型会无 WLAN）"
+grep -q 'wifi_cal_radio1' diy-part2.sh \
+  && grep -q 'rtl9617c-tyfza1.dtsi' diy-part2.sh \
+  && ok "diy-part2 校准断言检查公共 dtsi" || bad "diy-part2 校准断言未检查公共 dtsi"
 
 # ---------------------------------------------------------------
 sec "7. factory 校准 284 字节（WiFi -EINVAL 的根因修复）"

@@ -18,7 +18,7 @@
 #   2. 内核补丁 740      -> target/linux/rtl9617c/patches-6.18/
 #   3. 内核 config       -> target/linux/rtl9617c/config-6.18
 #      （开 rtw89 + NVMEM + MTD_UBI_NVMEM，关 rtl_ax_ap）
-#   4. DTS nvmem 绑定    -> R10 DTS 的 &pcie0/&pcie1 wifi 节点
+#   4. DTS nvmem 绑定    -> 公共 dtsi 的 &pcie0/&pcie1 wifi 节点（全机型覆盖）
 #   5. 固件             -> 双链路：
 #      a) 编进内核（CONFIG_EXTRA_FIRMWARE）：board/rtw89/firmware/ 下 6 个 ->
 #         files-6.18/firmware/，含 5G 探测序列 rtw8852c_fw-2.bin / -1.bin /
@@ -48,7 +48,12 @@ FW_DST="$WRT/target/linux/rtl9617c/files-6.18/firmware/rtw89"
 REGDB_DST="$WRT/target/linux/rtl9617c/files-6.18/firmware"
 PATCH_DST="$WRT/target/linux/rtl9617c/patches-6.18/740-wifi-rtw89-8192xb.patch"
 CFG="$WRT/target/linux/rtl9617c/config-6.18"
-DTS="$WRT/target/linux/rtl9617c/dts/rtl9617c-pt1570-r10.dts"
+# 校准绑定写到公共 dtsi（rtl9617c-tyfza1.dtsi），而不是某个板级 DTS：
+# 所有板级 DTS（R10/r10、tyfza1-4ge、tyfza1-2p5g）都 #include 这个 dtsi，
+# 且 pcie0/pcie1 节点与 wifi_cal_radio0/radio1 校准 cell 的 label 都定义在里面。
+# 这样无论 TARGET_MODEL 选哪个机型，rtw89 都能从 factory 卷读到校准数据。
+# 之前写死 R10 DTS 是缺陷：编译天邑机型时绑定根本不进 dtb -> 无 WLAN。
+DTS="$WRT/target/linux/rtl9617c/dts/rtl9617c-tyfza1.dtsi"
 
 for f in "$DRV_SRC" "$PATCH_SRC" "$FW_SRC" "$CFG" "$DTS"; do
   [ -e "$f" ] || fail "缺少 $f"
@@ -310,9 +315,11 @@ grep -q '^CONFIG_EXTRA_FIRMWARE_DIR="firmware"$' "$CFG" \
 echo "  config 已切 rtw89（NVMEM on / rtl_ax_ap off / 固件编内核 EXTRA_FIRMWARE）"
 
 # ---- 4. DTS：把 factory 校准 cell 接到 PCIe wifi 节点 ----
-# 硬件层 dtsi 已定义 wifi_cal_radio0(@2000,5G)/radio1(@3000,2.4G)，但没接到
-# PCIe 下的 wifi 设备。rtw89_factory.c 用 nvmem_cell_get(dev,"wifi-calibration")
-# 从各自 PCI 设备节点读取，所以必须在这里绑。
+# 公共 dtsi 已定义 pcie0(@f4325000)/pcie1(@f4326000) 与
+# wifi_cal_radio0(@2000,5G)/radio1(@3000,2.4G)，但没把校准 cell 接到 PCIe 下的
+# wifi 设备。rtw89_factory.c 用 nvmem_cell_get(dev,"wifi-calibration") 从各自
+# PCI 设备节点读取，所以必须在这里绑。绑定加到公共 dtsi（所有板级 DTS 都 include
+# 它），任一机型都能生效；这是修复"切天邑机型后无 WLAN"的关键。
 python3 - "$DTS" <<'PY'
 import pathlib, sys
 
