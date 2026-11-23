@@ -17,7 +17,7 @@ on:
       target_model:
         description: '选择要编译的机型（只产出所选机型的固件）。youhua_pt1570_r10=友华 PT1570-R10(默认/真机已验证)；tianyi_tyfza1_2p5g=天邑 TYFZA1 2.5G；tianyi_tyfza1_4ge=天邑 TYFZA1 4GE；youhua_pt1500_h10_2p5g=友华 PT1500-H10 2.5G（这三个为上游机型，未在本仓库真机验证）'
         required: false
-        default: 'youhua_pt1570_r10'
+        default: 'tianyi_tyfza1_2p5g'
         type: choice
         options:
           - youhua_pt1570_r10
