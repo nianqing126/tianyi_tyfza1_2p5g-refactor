@@ -273,3 +273,70 @@ grep -q 'of_machine_is_compatible("youhua,pt1570-r10")' "$XRAM" \
 grep -q 'index = 4 - port;' "$XRAM" \
   || fail 'xram R10 命名映射（index = 4 - port）缺失'
 echo "XRAM_R10_NAMING_OK=True (lan1..lan4 = panel LAN1..LAN4)"
+
+# ---------- 5. 公共 dtsi 的 chosen.bootargs 补齐 FIT 自洽启动参数 ----------
+# 上游 rtl9617c-tyfza1.dtsi 的 /chosen/bootargs 只有 console/loglevel，
+# 没有 root= 和 u-boot,version；它靠 bootloader 把 rootdisk 翻成 root= 注入，
+# 但 qwe-qaq rtl9617c-uboot 没有这段逻辑 -> 内核挂根失败（刷入起不来）。
+# R10 板级 DTS 自带一个完整 chosen 覆盖块，所以 R10 一直是好的；
+# 天邑 4GE/2.5G 用上游 DTS、没有覆盖块，才暴露这个问题（run #... 的
+# verify-fit-boot.py: bootargs 里没有 root=/dev/fit0）。
+# 这里改公共 dtsi：对所有板级 DTS（R10/天邑4GE/天邑2.5G）统一生效，
+# R10 自己的覆盖块后写覆盖、值相同，不受影响。rootdisk/volname=fit 上游已有，
+# 不动（verify-fit-boot.py 的 phandle 检查依赖它）。
+DTSI="$WRT/target/linux/rtl9617c/dts/rtl9617c-tyfza1.dtsi"
+[ -f "$DTSI" ] || fail "找不到 $DTSI（上游 dtsi 结构变了？）"
+python3 - "$DTSI" <<'PY'
+import pathlib, re, sys
+p = pathlib.Path(sys.argv[1])
+text = p.read_text(encoding='utf-8')
+
+BOOT_EXTRA = ' root=/dev/fit0 rootwait rootfstype=squashfs'
+# 已修过（幂等）：bootargs 已含 root=/dev/fit0 且 chosen 内有 u-boot,version
+if 'root=/dev/fit0' in text and 'u-boot,version' in text:
+    print('dtsi chosen.bootargs 已含 FIT 启动参数，跳过')
+    raise SystemExit(0)
+
+lines = text.split('\n')
+out = []
+in_chosen = False
+boot_done = uboot_done = False
+for ln in lines:
+    # 只处理第一个 /chosen 块（含 bootargs 的那个）；用大括号深度避免误判
+    if re.match(r'^\s*chosen\s*\{', ln):
+        in_chosen = True
+    if in_chosen and re.match(r'^\s*bootargs\s*=', ln):
+        m = re.match(r'^(\s*bootargs\s*=\s*")([^"]*)(".*)$', ln)
+        if not m:
+            raise SystemExit('ERROR: bootargs 行格式无法解析: ' + ln)
+        val = m.group(2)
+        if 'root=/dev/fit0' not in val:
+            ln = m.group(1) + val.rstrip() + BOOT_EXTRA + m.group(3)
+        boot_done = True
+        out.append(ln)
+        # 紧随 bootargs 之后插入 u-boot,version（同一 chosen 块内）
+        if 'u-boot,version' not in text:
+            indent = re.match(r'^(\s*)', ln).group(1)
+            out.append(indent + 'u-boot,version = "2025.01";')
+            uboot_done = True
+        continue
+    out.append(ln)
+    if in_chosen and re.match(r'^\s*\};', ln):
+        in_chosen = False
+
+new = '\n'.join(out)
+if 'root=/dev/fit0' not in new:
+    raise SystemExit('ERROR: 未能给 bootargs 追加 root=/dev/fit0')
+if 'u-boot,version' not in new:
+    raise SystemExit('ERROR: 未能给 chosen 补 u-boot,version')
+p.write_text(new, encoding='utf-8', newline='\n')
+print('dtsi chosen: bootargs 补齐 root=/dev/fit0 rootwait rootfstype=squashfs + u-boot,version')
+PY
+# 断言
+grep -q 'bootargs = ".*root=/dev/fit0.*rootwait' "$DTSI" \
+  || fail "dtsi bootargs 未补齐 root=/dev/fit0/rootwait"
+grep -q 'u-boot,version' "$DTSI" \
+  || fail "dtsi chosen 缺 u-boot,version"
+grep -q 'rootdisk' "$DTSI" \
+  || fail "dtsi 丢 rootdisk（fitblk ABI 会被破坏）"
+echo "DTSI_FIT_BOOT_OK=True (公共 dtsi 的 chosen 已是 FIT 自洽启动参数)"
