@@ -61,6 +61,34 @@ if grep -rqs -e '/luci-static/argon' -e 'luci\.themes\.Argon' \
 fi
 echo "  OK   厂商 argon 默认主题设置已清除（删除 $n_rm 个脚本）"
 
+# ---- 2b. 去掉 PON 包 Makefile 里对已删除 argon 包的依赖 ----
+# 厂商 package/luci-app-tyfza1-pon 的 LUCI_DEPENDS 写死了
+#   +luci-theme-argon +luci-i18n-argon-config-zh-cn
+# argon 包已删，但 luci.mk 会把这两项原样写进 PON 包的 apk Depends，
+# apk 安装阶段解析不到就报：
+#   ERROR: unable to select packages:
+#     luci-theme-argon (no such package): required by luci-app-tyfza1-pon
+#     luci-i18n-argon-config-zh-cn (no such package): required by ...
+# 主题改由 design 单独提供，PON 包不应硬依赖某个主题，删掉这两项即可
+# （基础中文 +luci-i18n-base-zh-cn 保留，不受影响）。
+PON_MK="$WRT/package/luci-app-tyfza1-pon/Makefile"
+if [ -f "$PON_MK" ]; then
+  sed -i -E \
+    -e 's/\+luci-theme-argon([[:space:]]|$)//g' \
+    -e 's/\+luci-i18n-argon-config-zh-cn([[:space:]]|$)//g' \
+    "$PON_MK"
+  echo "  OK   PON 包 Makefile 的 argon 依赖已移除"
+else
+  echo "::warning::未找到 $PON_MK，跳过 argon 依赖清理"
+fi
+# 断言：PON 包 Makefile 的 LUCI_DEPENDS 不得再依赖 argon（apk 安装会失败）
+if [ -f "$PON_MK" ] && grep '^LUCI_DEPENDS:=' "$PON_MK" | grep -q 'argon'; then
+  echo "ERROR: $PON_MK 的 LUCI_DEPENDS 仍含 argon 依赖（apk 安装会失败）" >&2
+  grep '^LUCI_DEPENDS:=' "$PON_MK" >&2
+  exit 1
+fi
+echo "  OK   PON 包依赖无 argon 残留"
+
 # ---- 3. 直接拉库 design 主题（锁 SHA，字节级可复现）----
 DST="$WRT/package/luci-theme-design"
 rm -rf "$DST"
