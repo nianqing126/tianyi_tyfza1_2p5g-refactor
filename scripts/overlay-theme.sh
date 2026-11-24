@@ -88,4 +88,32 @@ grep -q '/luci-static/design' "$DST/root/etc/uci-defaults/30_luci-theme-design" 
   || { echo "ERROR: 30_luci-theme-design 未设置 mediaurlbase=/luci-static/design" >&2; exit 1; }
 echo "  OK   design 包结构 + 默认主题脚本就位"
 
+# ---- 5. 修正 design 主题版本号（新版 apk 拒收 '-纯数字' release 段）----
+# 0x676e67/luci-theme-design 与 kenzok8 feed 的同名主题都用
+#   PKG_VERSION:=5.8.0-20240106
+# 新版 apk-tools 把 "-20240106" 解析成第二个 release 段，报
+#   ERROR: info field 'version' has invalid value: package version is invalid
+# 统一改成点号分段 5.8.0.20240106（与内核 6.18.55、2.3.1 等合法包口径一致）。
+# 必须同时改两份：编译实际用的是 feeds install 软链的 feeds/kenzok8 那份，
+# overlay 拉库到 package/ 的是另一份；两份版本号相同，都要规范化。
+n_fix=0
+while IFS= read -r mf; do
+  [ -f "$mf" ] || continue
+  sed -i -E 's/^(PKG_VERSION:=[0-9]+\.[0-9]+\.[0-9]+)-([0-9]{6,8})$/\1.\2/' "$mf"
+  n_fix=$((n_fix+1))
+done < <(find "$WRT/package" "$WRT/feeds" -path '*/luci-theme-design/Makefile' 2>/dev/null)
+echo "  OK   design 主题版本号已规范化（$n_fix 份 Makefile）"
+
+# 断言：所有 design 主题 Makefile 不得再残留 '-纯数字' 版本段（apk 会拒收）
+_bad=0
+while IFS= read -r mf; do
+  [ -f "$mf" ] || continue
+  if grep -Eq '^PKG_VERSION:=[0-9]+\.[0-9]+\.[0-9]+-[0-9]{6,8}$' "$mf"; then
+    echo "ERROR: $mf 版本号含非法 '-纯数字' 段（apk 会拒收）: $(grep '^PKG_VERSION' "$mf")" >&2
+    _bad=1
+  fi
+done < <(find "$WRT/package" "$WRT/feeds" -path '*/luci-theme-design/Makefile' 2>/dev/null)
+[ "$_bad" -eq 0 ] || exit 1
+echo "  OK   无非法 apk 版本号残留"
+
 echo "🎉 overlay-theme.sh 完成"
