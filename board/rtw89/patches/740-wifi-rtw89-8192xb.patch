@@ -184,8 +184,7 @@
  				const struct rtw89_reg2_def *reg,
 --- a/drivers/net/wireless/realtek/rtw89/phy.c
 +++ b/drivers/net/wireless/realtek/rtw89/phy.c
-@@ -1865,5 +1865,41 @@ static void rtw89_phy_init_rf_nctl(struct rtw89_dev *rtwdev)
- 	if (chip->nctl_post_table)
+@@ -1864,6 +1864,42 @@
  		rtw89_rfk_parser(rtwdev, chip->nctl_post_table);
  }
  
@@ -226,6 +225,8 @@
 +}
 +
  static u32 rtw89_phy0_phy1_offset_ax(struct rtw89_dev *rtwdev, u32 addr)
+ {
+ 	u32 phy_page = addr >> 8;
 --- a/drivers/net/wireless/realtek/rtw89/core.c
 +++ b/drivers/net/wireless/realtek/rtw89/core.c
 @@ -6095,7 +6095,14 @@ static int rtw89_chip_efuse_info_setup(struct rtw89_dev *rtwdev)
